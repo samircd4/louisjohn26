@@ -6,7 +6,7 @@ from rich import print
 
 RATE_PER_SECOND = 17   # ~1000/min
 TOTAL_REQUESTS = 1000
-URL = "http://127.0.0.1:8000/extract?product_id=210113269"
+URL = "http://76.13.243.197:8080/extract?product_id=210113269"
 
 
 class RateLimiter:
