@@ -1,61 +1,25 @@
-import streamlit as st
 import requests
-import re
-import pandas as pd
+from rich import print
 
-st.set_page_config(page_title="ASOS Scraper", layout="wide")
+def extract_zara():
+    url = "https://www.zara.com/uk/en/striped-short-sleeve-t-shirt-p04424015.html?ajax=true"
 
-st.title("ASOS Product Extractor")
+    headers = {
+        "accept": "*/*",
+        "accept-language": "en-US,en;q=0.9,bn;q=0.8",
+        "priority": "u=1, i",
+        "referer": "https://www.zara.com",
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+    }
 
-url_input = st.text_input("Enter ASOS URL or Product ID:", placeholder="https://www.asos.com/prd/...")
+    response = requests.get(url, headers=headers)
 
-if st.button("Extract"):
-    # 1. Parse the ID from URL
-    match = re.search(r'(?:/prd/|(?:\b))(\d{8,10})(?:\b)', url_input)
-    if match:
-        product_id = match.group(1)
-        
-        # 2. Hit the FastAPI Endpoint
-        with st.spinner("Fetching dummy data from FastAPI..."):
-            try:
-                backend_url = f"http://127.0.0.1:8000/extract?product_id={product_id}"
-                response = requests.get(backend_url)
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    st.success("Extraction Complete!")
+    with open("zara_response.json", "w", encoding="utf-8") as f:
+        f.write(response.text)
 
-                    # --- UI DISPLY: TABLE WITH IMAGE ---
-                    
-                    # We format the data into a list for Pandas
-                    # Note: We take the first image from the list for the table
-                    table_data = [{
-                        "Image": data["images"][0] + "?$n_320w$", # Thumbnail size
-                        "Title": data["title"],
-                        "Brand": data["brand"],
-                        "Product ID": product_id,
-                        "Link": data["url"]
-                    }]
 
-                    df = pd.DataFrame(table_data)
-
-                    # Display using Streamlit's modern Data Column configuration
-                    st.subheader("Product Details")
-                    st.data_editor(
-                        df,
-                        column_config={
-                            "Image": st.column_config.ImageColumn(
-                                "Product Image", help="Preview of the product"
-                            ),
-                            "Link": st.column_config.LinkColumn("View on ASOS")
-                        },
-                        hide_index=True,
-                        use_container_width=True
-                    )
-
-                else:
-                    st.error("Backend API is not responding correctly.")
-            except Exception as e:
-                st.error(f"Could not connect to Backend: {e}")
-    else:
-        st.error("Please enter a valid ASOS product URL.")
+if __name__ == "__main__":
+    extract_zara()
