@@ -4,7 +4,6 @@ import requests
 import time
 import os
 import shutil
-import uuid
 from rich import print
 from dotenv import load_dotenv
 
@@ -88,25 +87,24 @@ async def upload_csv(file: UploadFile = File(...)):
     try:
         # Check if the uploaded file is a CSV
         if not file.filename.endswith('.csv'):
-            raise HTTPException(status_code=400, detail="Only CSV files are allowed.")
+            raise HTTPException(status_code=400, detail="Only .csv files are allowed")
 
-        # Generate a unique filename using UUID to prevent overwriting
-        file_ext = os.path.splitext(file.filename)[1]
-        unique_name = f"{uuid.uuid4()}{file_ext}"
-        file_path = os.path.join(UPLOAD_DIR, unique_name)
+        # We use the original filename to allow overwriting/updating
+        # Warning: Ensure the filename is safe
+        filename = file.filename
+        file_path = os.path.join(UPLOAD_DIR, filename)
 
-        # Save the file to the local disk
+        # If the file already exists, 'wb' mode will overwrite it automatically
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
         return {
-            "status": "success",
-            "saved_as": unique_name,
-            "original_name": file.filename
+            "message": "File updated/uploaded successfully",
+            "filename": filename,
+            "path": file_path
         }
     except Exception as e:
-        # Print the error to your local terminal for debugging
-        print(f"Error: {e}")
+        print(f"Error during upload: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/download/{filename}")
@@ -129,4 +127,4 @@ async def list_files():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=9090)
+    uvicorn.run(app, host="0.0.0.0", port=8080)
