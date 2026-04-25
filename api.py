@@ -35,7 +35,8 @@ def extract_asos(product_id: str):
                 data_list = response.json()
 
                 if not data_list:
-                    raise HTTPException(status_code=404, detail="Product not found")
+                    raise HTTPException(
+                        status_code=404, detail="Product not found")
 
                 raw_data = data_list[0]
 
@@ -80,6 +81,42 @@ def extract_asos(product_id: str):
     )
 
 
+@app.get("/extract-zara")
+def extract_zara(product_url: str) -> dict:
+
+
+    product = {}
+    url = f"{product_url}?ajax=true"
+
+    headers = {
+        "accept": "*/*",
+        "accept-language": "en-US,en;q=0.9,bn;q=0.8",
+        "priority": "u=1, i",
+        "referer": "https://www.zara.com/",
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+    }
+
+    response = requests.get(url, headers=headers)
+    raw_data = response.json()
+
+    title = raw_data.get("product", {}).get("name")
+    brand = raw_data.get("productMetaData", [])[0].get("brand")
+    image = raw_data.get("product", {}).get("detail", {}).get("colors", [])[0].get("mainImgs", [])[0].get("extraInfo", {}).get("deliveryUrl", "")
+    url = raw_data.get("productMetaData", [])[0].get("url")
+    
+    
+    product = {
+        "title": title,
+        "brand": brand,
+        "images": [image] if image else [],
+        "url": url
+    }
+    return product
+
+
 # --- CSV File Management Endpoints ---
 
 @app.post("/upload-csv")
@@ -87,7 +124,8 @@ async def upload_csv(file: UploadFile = File(...)):
     try:
         # Check if the uploaded file is a CSV
         if not file.filename.endswith('.csv'):
-            raise HTTPException(status_code=400, detail="Only .csv files are allowed")
+            raise HTTPException(
+                status_code=400, detail="Only .csv files are allowed")
 
         # We use the original filename to allow overwriting/updating
         # Warning: Ensure the filename is safe
@@ -107,6 +145,7 @@ async def upload_csv(file: UploadFile = File(...)):
         print(f"Error during upload: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.get("/download/{filename}")
 async def download_file(filename: str):
     file_path = os.path.join(UPLOAD_DIR, filename)
@@ -115,10 +154,11 @@ async def download_file(filename: str):
         raise HTTPException(status_code=404, detail="File not found")
 
     return FileResponse(
-        path=file_path, 
-        filename=filename, 
+        path=file_path,
+        filename=filename,
         media_type='text/csv'
     )
+
 
 @app.get("/list-files")
 async def list_files():
