@@ -20,15 +20,46 @@ MAX_RETRIES = 3
 UPLOAD_DIR = "uploads"
 
 
-@app.get("/extract")
-def extract_asos(product_id: str):
-    url = f"https://www.asos.com/api/product/catalogue/v4/summaries?productIds={product_id}&store=COM"
+# Helper function to extract ASOS product ID from URL
+def get_asos_product_id(url: str):
+    if "prd/" not in url:
+        return None
+    return url.split("prd/")[1].split("?")[0].split("#")[0]
 
+
+def get_asos_price(product_id: str):
+    print(f"Fetching price for ASOS product ID: {product_id}")
+    f_url = f"https://www.asos.com/api/product/catalogue/v4/stockprice?productIds={product_id}&store=COM"
+    try:
+        response = requests.get(f_url, timeout=10)
+        if response.status_code == 200:
+            data_list = response.json()
+            if not data_list:
+                return ""
+            raw_data = data_list[0]
+            price_info = raw_data.get("productPrice", {}).get("current", {}).get("text", "")
+            print(price_info)
+            return price_info
+        else:
+            print(f"Failed to fetch price for product ID {product_id}: Status {response.status_code}")
+            return ""
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching price for product ID {product_id}: {e}")
+        return ""
+
+
+
+@app.get("/extract")
+def extract_asos(url: str):
+    product_id = get_asos_product_id(url)
+    
+    f_url = f"https://www.asos.com/api/product/catalogue/v4/summaries?productIds={product_id}&store=COM"
+    print(f"Extracting ASOS product data for ID: {product_id}")
     last_error = None
 
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            response = requests.get(url, proxies=PROXIES, timeout=10)
+            response = requests.get(f_url, proxies=PROXIES, timeout=10)
 
             # ✅ Success
             if response.status_code == 200:
@@ -39,15 +70,12 @@ def extract_asos(product_id: str):
                         status_code=404, detail="Product not found")
 
                 raw_data = data_list[0]
-
+                images = [f"https://{img.get('url')}" for img in raw_data.get("images", []) if img.get("isPrimary")]
                 data = {
                     "title": raw_data.get("name"),
+                    "price": get_asos_price(product_id),
                     "brand": raw_data.get("brandName"),
-                    "images": [
-                        f"https://{img.get('url')}"
-                        for img in raw_data.get("images", [])
-                        if img.get("isPrimary")
-                    ],
+                    "image_url": images[0] if images else "",
                     "url": raw_data.get("pdpUrl")
                 }
 
@@ -103,6 +131,7 @@ def extract_zara(product_url: str) -> dict:
     raw_data = response.json()
 
     title = raw_data.get("product", {}).get("name")
+    price = raw_data.get("productMetaData", [])[0].get("price", "")
     brand = raw_data.get("productMetaData", [])[0].get("brand")
     image = raw_data.get("product", {}).get("detail", {}).get("colors", [])[0].get("mainImgs", [])[0].get("extraInfo", {}).get("deliveryUrl", "")
     url = raw_data.get("productMetaData", [])[0].get("url")
@@ -110,8 +139,9 @@ def extract_zara(product_url: str) -> dict:
     
     product = {
         "title": title,
+        "price": price,
         "brand": brand,
-        "images": [image] if image else [],
+        "image_url": image if image else "",
         "url": url
     }
     return product

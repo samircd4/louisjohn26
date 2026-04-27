@@ -6,7 +6,7 @@ from rich import print
 
 RATE_PER_SECOND = 17   # ~1000/min
 TOTAL_REQUESTS = 1000
-URL = "http://76.13.243.197:8080/extract?product_id=210113269"
+URL = "http://127.0.0.1:8080/extract-zara?product_url=https%3A%2F%2Fwww.zara.com%2Fuk%2Fen%2Fz-05-high-waist-mom-fit-jeans-p04083022.html%3Fv1%3D496001520"
 
 
 class RateLimiter:
