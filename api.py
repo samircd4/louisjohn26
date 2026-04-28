@@ -47,11 +47,10 @@ def get_asos_price(product_id: str):
         print(f"Error fetching price for product ID {product_id}: {e}")
         return ""
 
-
-
+# --- ASOS Product Extraction Endpoint ---
 @app.get("/extract")
-def extract_asos(url: str):
-    product_id = get_asos_product_id(url)
+def extract_asos(product_url: str):
+    product_id = get_asos_product_id(product_url)
     
     f_url = f"https://www.asos.com/api/product/catalogue/v4/summaries?productIds={product_id}&store=COM"
     print(f"Extracting ASOS product data for ID: {product_id}")
@@ -108,7 +107,7 @@ def extract_asos(url: str):
         detail=f"Failed after {MAX_RETRIES} attempts: {last_error}"
     )
 
-
+# --- Zara Product Extraction Endpoint ---
 @app.get("/extract-zara")
 def extract_zara(product_url: str) -> dict:
 
@@ -139,7 +138,7 @@ def extract_zara(product_url: str) -> dict:
     
     product = {
         "title": title,
-        "price": price,
+        "price": str(f'£{price}'),
         "brand": brand,
         "image_url": image if image else "",
         "url": url
@@ -148,7 +147,6 @@ def extract_zara(product_url: str) -> dict:
 
 
 # --- CSV File Management Endpoints ---
-
 @app.post("/upload-csv")
 async def upload_csv(file: UploadFile = File(...)):
     try:
@@ -175,7 +173,7 @@ async def upload_csv(file: UploadFile = File(...)):
         print(f"Error during upload: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
+# --- File Download Endpoint ---
 @app.get("/download/{filename}")
 async def download_file(filename: str):
     file_path = os.path.join(UPLOAD_DIR, filename)
@@ -189,12 +187,13 @@ async def download_file(filename: str):
         media_type='text/csv'
     )
 
-
+# --- List Uploaded Files Endpoint ---
 @app.get("/list-files")
 async def list_files():
     files = os.listdir(UPLOAD_DIR)
     return {"files": files}
 
+# --- Main Entry Point ---
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8080)

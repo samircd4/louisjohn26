@@ -37,6 +37,7 @@ async def fetch(session, limiter, attempt):
             }
 
     except Exception as e:
+        print(f"Attempt {attempt}: Error - {e}")
         return {
             "success": False,
             "error": str(e)
