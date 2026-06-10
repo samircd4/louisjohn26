@@ -6,7 +6,7 @@ IS_PRODUCTION = os.getenv("PRODUCTION", "false").lower() == "true"
 
 if IS_PRODUCTION:
     # Replace with your actual VPS IP or Domain (e.g., "http://your-vps-ip" or "https://sarker.shop")
-    BASE_URL = "http://YOUR_VPS_IP_OR_DOMAIN"
+    BASE_URL = os.getenv("BASE_URL", "http://76.13.243.197:8080")
 else:
     BASE_URL = "http://127.0.0.1:8000"
 
