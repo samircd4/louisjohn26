@@ -1,21 +1,29 @@
 import os
 import httpx
 
-def download_image_advanced(url: str, folder_name: str, filename: str) -> str:
+# Check environment, default to localhost for testing
+IS_PRODUCTION = os.getenv("PRODUCTION", "false").lower() == "true"
+
+if IS_PRODUCTION:
+    # Replace with your actual VPS IP or Domain (e.g., "http://your-vps-ip" or "https://sarker.shop")
+    BASE_URL = "http://YOUR_VPS_IP_OR_DOMAIN"
+else:
+    BASE_URL = "http://127.0.0.1:8000"
+
+STATIC_ROUTE = "/images"
+
+def download_image_advanced(url: str, folder_name: str, filename: str) -> dict:
     """
     Downloads an image from a given URL using HTTP/2 protocol and detailed browser headers.
-    
-    This function is designed to bypass strict anti-bot and CDN protections (like Cloudflare or Akamai)
-    by mimicking a real browser fingerprint and connection profile.
-
-    Args:
-        url (str): The direct target URL or CDN endpoint of the image to download.
-        folder_name (str): The local directory directory path where the image will be saved (creates folder if missing).
-        filename (str): The target name of the saved file (e.g., 'product_image.jpg').
-
-    Returns:
-        str: The full local path to the saved image file if successful, or an empty string ("") if the download fails.
+    Returns a dictionary containing execution status, local file path, and public browser URL.
     """
+    result = {
+        "success": False,
+        "local_path": "",
+        "public_url": "",
+        "error": ""
+    }
+    
     try:
         if not os.path.exists(folder_name):
             os.makedirs(folder_name)
@@ -36,7 +44,7 @@ def download_image_advanced(url: str, folder_name: str, filename: str) -> str:
             'Sec-Fetch-Site': 'cross-site'
         }
         
-        # Using httpx Client with HTTP/2 support to mimic browser network layer
+        # HTTP/2 Client configuration
         with httpx.Client(http2=True, headers=headers, timeout=20.0) as client:
             response = client.get(url)
             response.raise_for_status()
@@ -44,20 +52,29 @@ def download_image_advanced(url: str, folder_name: str, filename: str) -> str:
             with open(full_path, 'wb') as file:
                 file.write(response.content)
                 
-        print(f"Success! Image saved to: {full_path}")
-        return full_path
+        # Generate browser accessible URL
+        public_url = f"{BASE_URL.rstrip('/')}{STATIC_ROUTE}/{filename}"
+        
+        result["success"] = True
+        result["local_path"] = full_path
+        result["public_url"] = public_url
+        return result
 
     except httpx.TimeoutException:
-        print("Error: The request timed out. ASOS CDN is still dropping the connection.")
+        result["error"] = "Error: The request timed out. CDN dropped connection."
     except httpx.HTTPStatusError as e:
-        print(f"HTTP Error occurred: {e.response.status_code} - {e.response.reason_phrase}")
+        result["error"] = f"HTTP Error occurred: {e.response.status_code}"
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-    return ""
+        result["error"] = f"An unexpected error occurred: {e}"
+        
+    return result
 
 if __name__ == "__main__":
-    image_url = "https://images.asos-media.com/products/under-armour-tech-textured-short-sleeve-t-shirt-in-lime/209938091-1-lime?$n_640w$&wid=513&fit=constrain"
-    folder_name = "downloaded_images"
-    file_name = "under_armour_tee_fixed.jpg"
+    # Test block for running directly via: uv run downloader.py
+    test_url = "https://images.asos-media.com/products/under-armour-tech-textured-short-sleeve-t-shirt-in-lime/209938091-1-lime?$n_640w$&wid=513&fit=constrain"
+    test_folder = "test_download"
+    test_file = "product_1.jpg"
     
-    download_image_advanced(image_url, folder_name, file_name)
+    print("Testing local download...")
+    data = download_image_advanced(test_url, test_folder, test_file)
+    print(data)
