@@ -94,7 +94,8 @@ def extract_asos(product_url: str):
                 image_filename = f"product_{product_id}.jpg"
                 
                 # Download logic triggers advanced bypass configuration
-                download_data = download_image_advanced(image_url, DOWNLOAD_DIR, image_filename)
+                proxy_url = os.getenv("PROXY")
+                download_data = download_image_advanced(image_url, DOWNLOAD_DIR, image_filename, proxy=proxy_url)
                 
                 # Construct public web URL instead of relative storage path
                 public_image_url = ""
