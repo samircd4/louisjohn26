@@ -157,3 +157,5 @@ Then navigate to `http://localhost:8501` in your browser.
 - Product images are formatted as 320px thumbnails for faster loading
 - The application filters primary product images only
 - All communication is local (127.0.0.1) unless deployed to a server
+
+
