@@ -7,6 +7,9 @@ import shutil
 from rich import print
 from dotenv import load_dotenv
 
+
+from helper import download_image_advanced
+
 load_dotenv()
 
 app = FastAPI()
@@ -70,11 +73,18 @@ def extract_asos(product_url: str):
 
                 raw_data = data_list[0]
                 images = [f"https://{img.get('url')}" for img in raw_data.get("images", []) if img.get("isPrimary")]
+                image_url = f'{images[0]}?$n_640w$&wid=513&fit=constrain' if images else ""
+                
+                # Download image
+                image_filename = f"product_{product_id}.jpg"
+                path = download_image_advanced(image_url, 'test_download', image_filename)
+                print(f"Image download path: {path}") 
+                
                 data = {
                     "title": raw_data.get("name"),
                     "price": get_asos_price(product_id),
                     "brand": raw_data.get("brandName"),
-                    "image_url": images[0] if images else "",
+                    "image_url": image_filename,
                     "url": raw_data.get("pdpUrl")
                 }
 
