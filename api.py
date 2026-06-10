@@ -19,13 +19,13 @@ app = FastAPI(title="Product Extractor API")
 IS_PRODUCTION = os.getenv("PRODUCTION", "false").lower() == "true"
 if IS_PRODUCTION:
     # Change this to your live domain or VPS IP
-    BASE_URL = "http://76.13.243.197:8080"
+    BASE_URL = "http://YOUR_VPS_IP_OR_DOMAIN"
 else:
     BASE_URL = "http://127.0.0.1:8000"
 
 STATIC_ROUTE = "/images"
 UPLOAD_DIR = "uploads"
-DOWNLOAD_DIR = "test_download"
+DOWNLOAD_DIR = "images"
 
 # Ensure crucial directories exist on startup
 os.makedirs(UPLOAD_DIR, exist_ok=True)
