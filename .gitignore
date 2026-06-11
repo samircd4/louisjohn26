@@ -11,3 +11,4 @@ wheels/
 .env
 venv/
 /uploads/response.html
+images/
