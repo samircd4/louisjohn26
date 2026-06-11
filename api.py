@@ -47,7 +47,7 @@ def get_asos_product_id(url: str):
     return url.split("prd/")[1].split("?")[0].split("#")[0]
 
 def get_asos_price(product_id: str):
-    print(f"Fetching price for ASOS product ID: {product_id}")
+    print(f"[cyan]💰 Fetching price for ASOS product ID: {product_id}[/cyan]")
     f_url = f"https://www.asos.com/api/product/catalogue/v4/stockprice?productIds={product_id}&store=COM"
     try:
         response = requests.get(f_url, timeout=10)
@@ -57,13 +57,13 @@ def get_asos_price(product_id: str):
                 return ""
             raw_data = data_list[0]
             price_info = raw_data.get("productPrice", {}).get("current", {}).get("text", "")
-            print(price_info)
+            print(f"[green]   Price fetched: {price_info}[/green]")
             return price_info
         else:
-            print(f"Failed to fetch price for product ID {product_id}: Status {response.status_code}")
+            print(f"[red]   Failed to fetch price for product ID {product_id}: Status {response.status_code}[/red]")
             return ""
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching price for product ID {product_id}: {e}")
+        print(f"[red]   Error fetching price for product ID {product_id}: {e}[/red]")
         return ""
 
 # --- ASOS Product Extraction Endpoint ---
@@ -72,12 +72,17 @@ def extract_asos(product_url: str):
     product_id = get_asos_product_id(product_url)
     if not product_id:
         raise HTTPException(status_code=400, detail="Invalid ASOS product URL template")
-    
+
     f_url = f"https://www.asos.com/api/product/catalogue/v4/summaries?productIds={product_id}&store=COM"
-    print(f"Extracting ASOS product data for ID: {product_id}")
+
+    print(f"\n[bold magenta]══════════════════════════════════════[/bold magenta]")
+    print(f"[bold magenta]   ASOS EXTRACT REQUEST — ID: {product_id}[/bold magenta]")
+    print(f"[bold magenta]══════════════════════════════════════[/bold magenta]")
+
     last_error = None
 
     for attempt in range(1, MAX_RETRIES + 1):
+        print(f"\n[bold white]── Attempt {attempt}/{MAX_RETRIES} ──[/bold white]")
         try:
             response = requests.get(f_url, proxies=PROXIES, timeout=10)
 
@@ -90,17 +95,27 @@ def extract_asos(product_url: str):
                 raw_data = data_list[0]
                 images = [f"https://{img.get('url')}" for img in raw_data.get("images", []) if img.get("isPrimary")]
                 image_url = f'{images[0]}?$n_640w$&wid=513&fit=constrain' if images else ""
-                
+
                 image_filename = f"product_{product_id}.jpg"
-                
-                # Download logic triggers advanced bypass configuration
-                download_data = download_image_advanced(image_url, DOWNLOAD_DIR, image_filename)
-                
-                # Construct public web URL instead of relative storage path
-                public_image_url = ""
-                if download_data and download_data.get("success"):
-                    public_image_url = f"{BASE_URL.rstrip('/')}{STATIC_ROUTE}/{image_filename}"
-                
+
+                # ── Image Download Block ──────────────────────────────────
+                if image_url:
+                    print(f"[bold cyan]\n🖼  Attempting image download for product {product_id}...[/bold cyan]")
+                    download_data = download_image_advanced(image_url, DOWNLOAD_DIR, image_filename)
+
+                    if download_data and download_data.get("success"):
+                        public_image_url = f"{BASE_URL.rstrip('/')}{STATIC_ROUTE}/{image_filename}"
+                        print(f"[bold green]🟢 Image ready at: {public_image_url}[/bold green]")
+                    else:
+                        public_image_url = ""
+                        error_detail = download_data.get("error", "Unknown error") if download_data else "No response from downloader"
+                        print(f"[bold red]🔴 Image download FAILED — product will have no image.[/bold red]")
+                        print(f"[red]   Reason: {error_detail}[/red]")
+                else:
+                    public_image_url = ""
+                    print(f"[yellow]⚠  No primary image URL found for product {product_id} — skipping download.[/yellow]")
+                # ─────────────────────────────────────────────────────────
+
                 data = {
                     "title": raw_data.get("name"),
                     "price": get_asos_price(product_id),
@@ -109,12 +124,16 @@ def extract_asos(product_url: str):
                     "url": raw_data.get("pdpUrl")
                 }
 
-                print(f"[SUCCESS] Attempt {attempt}")
+                print(f"\n[bold green]✅ EXTRACTION COMPLETE — Attempt {attempt}[/bold green]")
+                print(f"[green]   Title : {data['title']}[/green]")
+                print(f"[green]   Brand : {data['brand']}[/green]")
+                print(f"[green]   Price : {data['price']}[/green]")
+                print(f"[green]   Image : {data['image_url'] or 'N/A'}[/green]\n")
                 return data
 
             elif response.status_code >= 500:
                 last_error = f"Server error {response.status_code}"
-                print(f"[RETRY] Attempt {attempt} - {last_error}")
+                print(f"[yellow]⚠  Attempt {attempt} — {last_error}, will retry...[/yellow]")
 
             else:
                 raise HTTPException(
@@ -124,11 +143,14 @@ def extract_asos(product_url: str):
 
         except requests.exceptions.RequestException as e:
             last_error = str(e)
-            print(f"[ERROR] Attempt {attempt} - {last_error}")
+            print(f"[red]❌ Attempt {attempt} — Request error: {last_error}[/red]")
 
         if attempt < MAX_RETRIES:
-            time.sleep(2 ** (attempt - 1))
+            wait = 2 ** (attempt - 1)
+            print(f"[yellow]   ⏳ Waiting {wait}s before retry...[/yellow]")
+            time.sleep(wait)
 
+    print(f"[bold red]💀 ALL {MAX_RETRIES} ATTEMPTS FAILED — {last_error}[/bold red]\n")
     raise HTTPException(
         status_code=500,
         detail=f"Failed after {MAX_RETRIES} attempts: {last_error}"
@@ -158,7 +180,7 @@ def extract_zara(product_url: str) -> dict:
     brand = raw_data.get("productMetaData", [])[0].get("brand")
     image = raw_data.get("product", {}).get("detail", {}).get("colors", [])[0].get("mainImgs", [])[0].get("extraInfo", {}).get("deliveryUrl", "")
     pdp_url = raw_data.get("productMetaData", [])[0].get("url")
-    
+
     product = {
         "title": title,
         "price": f"£{price}",
@@ -187,7 +209,7 @@ async def upload_csv(file: UploadFile = File(...)):
             "path": file_path
         }
     except Exception as e:
-        print(f"Error during upload: {e}")
+        print(f"[red]Error during upload: {e}[/red]")
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- File Download Endpoint ---
