@@ -1,13 +1,12 @@
 import os
 import httpx
-import traceback  # Added to print detailed error stacks if needed
 
 # Check environment, default to localhost for testing
 IS_PRODUCTION = os.getenv("PRODUCTION", "false").lower() == "true"
 
 if IS_PRODUCTION:
     # Replace with your actual VPS IP or Domain (e.g., "http://your-vps-ip" or "https://sarker.shop")
-    BASE_URL = os.getenv("BASE_URL", "http://76.13.243.197:8080")
+    BASE_URL = os.getenv("BASE_URL", "http://76.13.243.197:8080/")
 else:
     BASE_URL = "http://127.0.0.1:8000"
 
@@ -63,15 +62,10 @@ def download_image_advanced(url: str, folder_name: str, filename: str) -> dict:
 
     except httpx.TimeoutException:
         result["error"] = "Error: The request timed out. CDN dropped connection."
-        print(f"\n[IMAGE DOWNLOAD ERROR] Timeout on URL: {url}\nDetails: {result['error']}\n")
     except httpx.HTTPStatusError as e:
         result["error"] = f"HTTP Error occurred: {e.response.status_code}"
-        print(f"\n[IMAGE DOWNLOAD ERROR] ASOS Blocked VPS IP with Status {e.response.status_code} for URL: {url}\n")
     except Exception as e:
         result["error"] = f"An unexpected error occurred: {e}"
-        print(f"\n[IMAGE DOWNLOAD ERROR] Crash on URL: {url}\nException: {str(e)}")
-        traceback.print_exc()  # Prints the exact traceback line numbers to terminal
-        print("\n")
         
     return result
 
