@@ -157,9 +157,29 @@ def extract_asos(product_url: str):
 
 
 # --- Zara Product Extraction Endpoint ---
+def get_zara_product_id(url: str) -> str:
+    """
+    Extracts a numeric product ID from a Zara URL.
+    e.g. https://www.zara.com/uk/en/...p/123456789.html → 123456789
+    Falls back to a hash of the URL if no numeric ID is found.
+    """
+    import re
+    match = re.search(r'/p/(\d+)', url)
+    if match:
+        return match.group(1)
+    # Fallback: use last path segment stripped of extension
+    segment = url.rstrip("/").split("/")[-1].split(".")[0]
+    return segment if segment else str(abs(hash(url)))[:10]
+
+
 @app.get("/extract-zara")
 def extract_zara(product_url: str) -> dict:
     url = f"{product_url}?ajax=true"
+
+    print(f"\n[bold magenta]══════════════════════════════════════[/bold magenta]")
+    print(f"[bold magenta]   ZARA EXTRACT REQUEST[/bold magenta]")
+    print(f"[bold magenta]   URL: {product_url}[/bold magenta]")
+    print(f"[bold magenta]══════════════════════════════════════[/bold magenta]")
 
     headers = {
         "accept": "*/*",
@@ -173,21 +193,56 @@ def extract_zara(product_url: str) -> dict:
     }
 
     response = requests.get(url, headers=headers)
+    if response.status_code != 200:
+        print(f"[red]❌ Zara API returned status {response.status_code}[/red]")
+        raise HTTPException(status_code=response.status_code, detail="Zara API rejected the request")
+
     raw_data = response.json()
 
     title = raw_data.get("product", {}).get("name")
     price = raw_data.get("productMetaData", [])[0].get("price", "")
     brand = raw_data.get("productMetaData", [])[0].get("brand")
-    image = raw_data.get("product", {}).get("detail", {}).get("colors", [])[0].get("mainImgs", [])[0].get("extraInfo", {}).get("deliveryUrl", "")
+    image_source_url = raw_data.get("product", {}).get("detail", {}).get("colors", [])[0].get("mainImgs", [])[0].get("extraInfo", {}).get("deliveryUrl", "")
     pdp_url = raw_data.get("productMetaData", [])[0].get("url")
+
+    print(f"[cyan]   Title  : {title}[/cyan]")
+    print(f"[cyan]   Brand  : {brand}[/cyan]")
+    print(f"[cyan]   Price  : £{price}[/cyan]")
+
+    # ── Image Download Block ──────────────────────────────────
+    public_image_url = ""
+    if image_source_url:
+        product_id = get_zara_product_id(product_url)
+        image_filename = f"zara_product_{product_id}.jpg"
+
+        print(f"[bold cyan]\n🖼  Attempting image download for Zara product {product_id}...[/bold cyan]")
+        download_data = download_image_advanced(image_source_url, DOWNLOAD_DIR, image_filename, proxy=PROXY)
+
+        if download_data and download_data.get("success"):
+            public_image_url = f"{BASE_URL.rstrip('/')}{STATIC_ROUTE}/{image_filename}"
+            print(f"[bold green]🟢 Image ready at: {public_image_url}[/bold green]")
+        else:
+            error_detail = download_data.get("error", "Unknown error") if download_data else "No response from downloader"
+            print(f"[bold red]🔴 Image download FAILED — product will have no image.[/bold red]")
+            print(f"[red]   Reason: {error_detail}[/red]")
+    else:
+        print(f"[yellow]⚠  No image URL found in Zara response — skipping download.[/yellow]")
+    # ─────────────────────────────────────────────────────────
 
     product = {
         "title": title,
         "price": f"£{price}",
         "brand": brand,
-        "image_url": image if image else "",
+        "image_url": public_image_url,
         "url": pdp_url
     }
+
+    print(f"\n[bold green]✅ ZARA EXTRACTION COMPLETE[/bold green]")
+    print(f"[green]   Title : {product['title']}[/green]")
+    print(f"[green]   Brand : {product['brand']}[/green]")
+    print(f"[green]   Price : {product['price']}[/green]")
+    print(f"[green]   Image : {product['image_url'] or 'N/A'}[/green]\n")
+
     return product
 
 
