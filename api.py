@@ -1,7 +1,6 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
 import requests
 import time
 import os
@@ -18,7 +17,6 @@ app = FastAPI(title="Product Extractor API")
 # Setup environment based dynamic base URL
 IS_PRODUCTION = os.getenv("PRODUCTION", "false").lower() == "true"
 if IS_PRODUCTION:
-    # Change this to your live domain or VPS IP
     BASE_URL = "http://76.13.243.197:8080"
 else:
     BASE_URL = "http://127.0.0.1:8000"
@@ -34,17 +32,17 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 # Mount static folder for direct browser image streaming
 app.mount(STATIC_ROUTE, StaticFiles(directory=DOWNLOAD_DIR), name="images")
 
-PROXIES = {
-    "http": os.getenv("PROXY"),
-    "https": os.getenv("PROXY")
-}
+# Read proxy once — passed explicitly into the image downloader
+PROXY = os.getenv("PROXY")
 
 MAX_RETRIES = 3
+
 
 def get_asos_product_id(url: str):
     if "prd/" not in url:
         return None
     return url.split("prd/")[1].split("?")[0].split("#")[0]
+
 
 def get_asos_price(product_id: str):
     print(f"[cyan]💰 Fetching price for ASOS product ID: {product_id}[/cyan]")
@@ -66,6 +64,7 @@ def get_asos_price(product_id: str):
         print(f"[red]   Error fetching price for product ID {product_id}: {e}[/red]")
         return ""
 
+
 # --- ASOS Product Extraction Endpoint ---
 @app.get("/extract")
 def extract_asos(product_url: str):
@@ -80,11 +79,12 @@ def extract_asos(product_url: str):
     print(f"[bold magenta]══════════════════════════════════════[/bold magenta]")
 
     last_error = None
+    proxies = {"http": PROXY, "https": PROXY}
 
     for attempt in range(1, MAX_RETRIES + 1):
         print(f"\n[bold white]── Attempt {attempt}/{MAX_RETRIES} ──[/bold white]")
         try:
-            response = requests.get(f_url, proxies=PROXIES, timeout=10)
+            response = requests.get(f_url, proxies=proxies, timeout=10)
 
             if response.status_code == 200:
                 data_list = response.json()
@@ -95,24 +95,23 @@ def extract_asos(product_url: str):
                 raw_data = data_list[0]
                 images = [f"https://{img.get('url')}" for img in raw_data.get("images", []) if img.get("isPrimary")]
                 image_url = f'{images[0]}?$n_640w$&wid=513&fit=constrain' if images else ""
-
                 image_filename = f"product_{product_id}.jpg"
 
                 # ── Image Download Block ──────────────────────────────────
+                public_image_url = ""
                 if image_url:
                     print(f"[bold cyan]\n🖼  Attempting image download for product {product_id}...[/bold cyan]")
-                    download_data = download_image_advanced(image_url, DOWNLOAD_DIR, image_filename)
+                    # Pass PROXY so helper can route through it on VPS
+                    download_data = download_image_advanced(image_url, DOWNLOAD_DIR, image_filename, proxy=PROXY)
 
                     if download_data and download_data.get("success"):
                         public_image_url = f"{BASE_URL.rstrip('/')}{STATIC_ROUTE}/{image_filename}"
                         print(f"[bold green]🟢 Image ready at: {public_image_url}[/bold green]")
                     else:
-                        public_image_url = ""
                         error_detail = download_data.get("error", "Unknown error") if download_data else "No response from downloader"
                         print(f"[bold red]🔴 Image download FAILED — product will have no image.[/bold red]")
                         print(f"[red]   Reason: {error_detail}[/red]")
                 else:
-                    public_image_url = ""
                     print(f"[yellow]⚠  No primary image URL found for product {product_id} — skipping download.[/yellow]")
                 # ─────────────────────────────────────────────────────────
 
@@ -156,6 +155,7 @@ def extract_asos(product_url: str):
         detail=f"Failed after {MAX_RETRIES} attempts: {last_error}"
     )
 
+
 # --- Zara Product Extraction Endpoint ---
 @app.get("/extract-zara")
 def extract_zara(product_url: str) -> dict:
@@ -190,6 +190,7 @@ def extract_zara(product_url: str) -> dict:
     }
     return product
 
+
 # --- CSV File Management Endpoints ---
 @app.post("/upload-csv")
 async def upload_csv(file: UploadFile = File(...)):
@@ -212,6 +213,7 @@ async def upload_csv(file: UploadFile = File(...)):
         print(f"[red]Error during upload: {e}[/red]")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 # --- File Download Endpoint ---
 @app.get("/download/{filename}")
 async def download_file(filename: str):
@@ -226,11 +228,13 @@ async def download_file(filename: str):
         media_type='text/csv'
     )
 
+
 # --- List Uploaded Files Endpoint ---
 @app.get("/list-files")
 async def list_files():
     files = os.listdir(UPLOAD_DIR)
     return {"files": files}
+
 
 if __name__ == "__main__":
     import uvicorn
