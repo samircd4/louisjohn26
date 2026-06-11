@@ -19,7 +19,7 @@ app = FastAPI(title="Product Extractor API")
 IS_PRODUCTION = os.getenv("PRODUCTION", "false").lower() == "true"
 if IS_PRODUCTION:
     # Change this to your live domain or VPS IP
-    BASE_URL = "http://YOUR_VPS_IP_OR_DOMAIN"
+    BASE_URL = "http://76.13.243.197:8080"
 else:
     BASE_URL = "http://127.0.0.1:8000"
 
@@ -94,8 +94,7 @@ def extract_asos(product_url: str):
                 image_filename = f"product_{product_id}.jpg"
                 
                 # Download logic triggers advanced bypass configuration
-                proxy_url = os.getenv("PROXY")
-                download_data = download_image_advanced(image_url, DOWNLOAD_DIR, image_filename, proxy=proxy_url)
+                download_data = download_image_advanced(image_url, DOWNLOAD_DIR, image_filename)
                 
                 # Construct public web URL instead of relative storage path
                 public_image_url = ""
