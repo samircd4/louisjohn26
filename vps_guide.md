@@ -12,3 +12,8 @@ sudo systemctl start product-extractor
 
 # 2. Enable it so it boots automatically if your VPS restarts
 sudo systemctl enable product-extractor
+
+
+
+# Restart the Service
+sudo systemctl restart product-extractor

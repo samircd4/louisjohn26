@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 import requests
 import time
 import os
@@ -13,6 +14,10 @@ from helper import download_image_advanced
 load_dotenv()
 
 app = FastAPI(title="Product Extractor API")
+app.add_middleware(
+    TrustedHostMiddleware, 
+    allowed_hosts=["api.sarker.shop", "localhost", "127.0.0.1"]
+)
 
 # Setup environment based dynamic base URL
 IS_PRODUCTION = os.getenv("PRODUCTION", "false").lower() == "true"
