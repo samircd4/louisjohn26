@@ -22,7 +22,7 @@ app.add_middleware(
 # Setup environment based dynamic base URL
 IS_PRODUCTION = os.getenv("PRODUCTION", "false").lower() == "true"
 if IS_PRODUCTION:
-    BASE_URL = "http://76.13.243.197:8080"
+    BASE_URL = "https://api.sarker.shop"
 else:
     BASE_URL = "http://127.0.0.1:8000"
 
