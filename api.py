@@ -16,30 +16,27 @@ load_dotenv()
 
 app = FastAPI(title="Product Extractor API")
 
-# 1. Trusted Host Middleware Configuration
+# 1. Trusted Host Middleware Configuration (Fixed: Removed protocols & corrected syntax)
+# Note: For production wildcard subdomains like *.base44.app, FastAPI relies on standard 
+# host patterns using leading periods: .base44.app matches base44.app and all subdomains.
 app.add_middleware(
     TrustedHostMiddleware, 
-    allowed_hosts=["api.sarker.shop", "localhost", "127.0.0.1","https://app.base44.io", "https://preview-sandbox–689b7eed977c731b31b54a7c.base44.app", "*.base44.app"]
+    allowed_hosts=[
+        "api.sarker.shop", 
+        "localhost", 
+        "127.0.0.1", 
+        "app.base44.io", 
+        ".base44.app"
+    ]
 )
 
-# 2. CORS Middleware Configuration
-# Add your frontend application URLs to this list
-origins = [
-    "http://localhost:3000",       # Local frontend development (React/Next.js/Vue, etc.)
-    "http://127.0.0.1:3000",
-    "https://sarker.shop",          # Replace with your actual production frontend domain
-    "https://www.sarker.shop",
-    "https://app.base44.io",
-    "*.base44.app",
-    "https://preview-sandbox–689b7eed977c731b31b54a7c.base44.app"
-]
-
+# 2. CORS Middleware Configuration (Fixed: Configured explicitly for Public Wildcard GET API)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,            # Allows preflight requests from these origins
-    allow_credentials=True,
-    allow_methods=["GET", "OPTIONS"], # Explicitly allows GET and OPTIONS as requested
-    allow_headers=["*"],              # Allows all required headers sent by the browser
+    allow_origins=["*"],              # Returns Access-Control-Allow-Origin: * to all responses
+    allow_credentials=False,          # Required by browsers when allow_origins is set to "*"
+    allow_methods=["GET", "OPTIONS"], # Explicitly allows GET and OPTIONS, responding with 200/204 to preflights
+    allow_headers=["*"],              # Dynamic allowance for all headers requested by the client
 )
 
 # Setup environment based dynamic base URL
