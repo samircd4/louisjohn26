@@ -19,7 +19,7 @@ app = FastAPI(title="Product Extractor API")
 # 1. Trusted Host Middleware Configuration
 app.add_middleware(
     TrustedHostMiddleware, 
-    allowed_hosts=["api.sarker.shop", "localhost", "127.0.0.1"]
+    allowed_hosts=["api.sarker.shop", "localhost", "127.0.0.1","https://app.base44.io"]
 )
 
 # 2. CORS Middleware Configuration
@@ -29,6 +29,7 @@ origins = [
     "http://127.0.0.1:3000",
     "https://sarker.shop",          # Replace with your actual production frontend domain
     "https://www.sarker.shop",
+    "https://app.base44.io"
 ]
 
 app.add_middleware(
