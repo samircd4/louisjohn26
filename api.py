@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.middleware.cors import CORSMiddleware  # <-- Imported CORS Middleware
 import requests
 import time
 import os
@@ -14,9 +15,28 @@ from helper import download_image_advanced
 load_dotenv()
 
 app = FastAPI(title="Product Extractor API")
+
+# 1. Trusted Host Middleware Configuration
 app.add_middleware(
     TrustedHostMiddleware, 
     allowed_hosts=["api.sarker.shop", "localhost", "127.0.0.1"]
+)
+
+# 2. CORS Middleware Configuration
+# Add your frontend application URLs to this list
+origins = [
+    "http://localhost:3000",       # Local frontend development (React/Next.js/Vue, etc.)
+    "http://127.0.0.1:3000",
+    "https://sarker.shop",          # Replace with your actual production frontend domain
+    "https://www.sarker.shop",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,            # Allows preflight requests from these origins
+    allow_credentials=True,
+    allow_methods=["GET", "OPTIONS"], # Explicitly allows GET and OPTIONS as requested
+    allow_headers=["*"],              # Allows all required headers sent by the browser
 )
 
 # Setup environment based dynamic base URL
@@ -106,7 +126,6 @@ def extract_asos(product_url: str):
                 public_image_url = ""
                 if image_url:
                     print(f"[bold cyan]\n🖼  Attempting image download for product {product_id}...[/bold cyan]")
-                    # Pass PROXY so helper can route through it on VPS
                     download_data = download_image_advanced(image_url, DOWNLOAD_DIR, image_filename, proxy=PROXY)
 
                     if download_data and download_data.get("success"):
@@ -163,16 +182,10 @@ def extract_asos(product_url: str):
 
 # --- Zara Product Extraction Endpoint ---
 def get_zara_product_id(url: str) -> str:
-    """
-    Extracts a numeric product ID from a Zara URL.
-    e.g. https://www.zara.com/uk/en/...p/123456789.html → 123456789
-    Falls back to a hash of the URL if no numeric ID is found.
-    """
     import re
     match = re.search(r'/p/(\d+)', url)
     if match:
         return match.group(1)
-    # Fallback: use last path segment stripped of extension
     segment = url.rstrip("/").split("/")[-1].split(".")[0]
     return segment if segment else str(abs(hash(url)))[:10]
 
