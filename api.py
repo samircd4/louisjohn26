@@ -11,6 +11,7 @@ from rich import print
 from dotenv import load_dotenv
 
 from helper import download_image_advanced
+from scraper import get_cos
 
 load_dotenv()
 
@@ -91,7 +92,7 @@ def get_asos_price(product_id: str):
 
 
 # --- ASOS Product Extraction Endpoint ---
-@app.get("/extract")
+@app.get("/extract-asos", tags=["Product Extraction"])
 def extract_asos(product_url: str):
     product_id = get_asos_product_id(product_url)
     if not product_id:
@@ -190,7 +191,7 @@ def get_zara_product_id(url: str) -> str:
     return segment if segment else str(abs(hash(url)))[:10]
 
 
-@app.get("/extract-zara")
+@app.get("/extract-zara", tags=["Product Extraction"])
 def extract_zara(product_url: str) -> dict:
     url = f"{product_url}?ajax=true"
 
@@ -263,9 +264,17 @@ def extract_zara(product_url: str) -> dict:
 
     return product
 
+# Extract COS product details
+@app.get("/extract-cos", tags=["Product Extraction"])
+def extract_cos(product_url: str) -> dict:
+    """
+    Extracts product title, price, brand, and image URL from a valid COS product link.
+    """
+    product = get_cos(product_url)
+    return product
 
 # --- CSV File Management Endpoints ---
-@app.post("/upload-csv")
+@app.post("/upload-csv", tags=["CSV Management"])
 async def upload_csv(file: UploadFile = File(...)):
     try:
         if not file.filename.endswith('.csv'):
@@ -288,7 +297,7 @@ async def upload_csv(file: UploadFile = File(...)):
 
 
 # --- File Download Endpoint ---
-@app.get("/download/{filename}")
+@app.get("/download/{filename}", tags=["CSV Management"])
 async def download_file(filename: str):
     file_path = os.path.join(UPLOAD_DIR, filename)
 
@@ -303,7 +312,7 @@ async def download_file(filename: str):
 
 
 # --- List Uploaded Files Endpoint ---
-@app.get("/list-files")
+@app.get("/list-files", tags=["CSV Management"])
 async def list_files():
     files = os.listdir(UPLOAD_DIR)
     return {"files": files}

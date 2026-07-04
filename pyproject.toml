@@ -8,9 +8,11 @@ dependencies = [
     "aiohttp>=3.13.5",
     "fastapi>=0.136.0",
     "httpx[http2]>=0.28.1",
+    "pip-system-certs>=5.3",
     "python-dotenv>=1.2.2",
     "python-multipart>=0.0.26",
     "requests>=2.33.1",
     "rich>=15.0.0",
+    "selectolax>=0.4.10",
     "uvicorn>=0.44.0",
 ]
