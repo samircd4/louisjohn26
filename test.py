@@ -13,7 +13,7 @@ def get_cos(url):
         'product_url': url,
     }
 
-    response = requests.get('http://127.0.0.1:8080/extract-cos', params=params, headers=headers)
+    response = requests.get('https://api.sarker.shop/extract-cos', params=params, headers=headers)
 
     data = response.json()
 

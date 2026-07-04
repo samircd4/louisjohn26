@@ -19,3 +19,6 @@ sudo systemctl restart product-extractor
 
 # Stop the service
 sudo systemctl stop asos-api.service
+
+sudo nginx -t
+sudo systemctl reload nginx
