@@ -1,8 +1,8 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.middleware.cors import CORSMiddleware  # <-- Imported CORS Middleware
+from fastapi.middleware.cors import CORSMiddleware
 import requests
 import time
 import os
@@ -10,16 +10,13 @@ import shutil
 from rich import print
 from dotenv import load_dotenv
 
-from helper import download_image_advanced
+from helper import download_image_advanced, extract_product_id
 from scraper import get_cos
 
 load_dotenv()
 
 app = FastAPI(title="Product Extractor API")
 
-# 1. Trusted Host Middleware Configuration (Fixed: Removed protocols & corrected syntax)
-# Note: For production wildcard subdomains like *.base44.app, FastAPI relies on standard 
-# host patterns using leading periods: .base44.app matches base44.app and all subdomains.
 app.add_middleware(
     TrustedHostMiddleware, 
     allowed_hosts=[
@@ -27,47 +24,30 @@ app.add_middleware(
         "localhost", 
         "127.0.0.1", 
         "app.base44.io", 
-        ".base44.app"
+        ".base44.app",
+        "*"  # Allow external VPS IP requests safely
     ]
 )
 
-# 2. CORS Middleware Configuration (Fixed: Configured explicitly for Public Wildcard GET API)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],              # Returns Access-Control-Allow-Origin: * to all responses
-    allow_credentials=False,          # Required by browsers when allow_origins is set to "*"
-    allow_methods=["GET", "OPTIONS"], # Explicitly allows GET and OPTIONS, responding with 200/204 to preflights
-    allow_headers=["*"],              # Dynamic allowance for all headers requested by the client
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "OPTIONS"],
+    allow_headers=["*"],
 )
-
-# Setup environment based dynamic base URL
-IS_PRODUCTION = os.getenv("PRODUCTION", "false").lower() == "true"
-if IS_PRODUCTION:
-    BASE_URL = "https://api.sarker.shop"
-else:
-    BASE_URL = "http://127.0.0.1:8000"
 
 STATIC_ROUTE = "/images"
 UPLOAD_DIR = "uploads"
 DOWNLOAD_DIR = "images"
 
-# Ensure crucial directories exist on startup
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-# Mount static folder for direct browser image streaming
 app.mount(STATIC_ROUTE, StaticFiles(directory=DOWNLOAD_DIR), name="images")
 
-# Read proxy once — passed explicitly into the image downloader
 PROXY = os.getenv("PROXY")
-
 MAX_RETRIES = 3
-
-
-def get_asos_product_id(url: str):
-    if "prd/" not in url:
-        return None
-    return url.split("prd/")[1].split("?")[0].split("#")[0]
 
 
 def get_asos_price(product_id: str):
@@ -93,8 +73,8 @@ def get_asos_price(product_id: str):
 
 # --- ASOS Product Extraction Endpoint ---
 @app.get("/extract-asos", tags=["Product Extraction"])
-def extract_asos(product_url: str):
-    product_id = get_asos_product_id(product_url)
+def extract_asos(product_url: str, request: Request):
+    product_id = extract_product_id(product_url)
     if not product_id:
         raise HTTPException(status_code=400, detail="Invalid ASOS product URL template")
 
@@ -106,6 +86,9 @@ def extract_asos(product_url: str):
 
     last_error = None
     proxies = {"http": PROXY, "https": PROXY}
+
+    # Dynamically build host base URL from current request
+    base_url = str(request.base_url).rstrip("/")
 
     for attempt in range(1, MAX_RETRIES + 1):
         print(f"\n[bold white]── Attempt {attempt}/{MAX_RETRIES} ──[/bold white]")
@@ -123,36 +106,46 @@ def extract_asos(product_url: str):
                 image_url = f'{images[0]}?$n_640w$&wid=513&fit=constrain' if images else ""
                 image_filename = f"product_{product_id}.jpg"
 
-                # ── Image Download Block ──────────────────────────────────
                 public_image_url = ""
+                thumbnail_url = ""
+
                 if image_url:
                     print(f"[bold cyan]\n🖼  Attempting image download for product {product_id}...[/bold cyan]")
                     download_data = download_image_advanced(image_url, DOWNLOAD_DIR, image_filename, proxy=PROXY)
 
                     if download_data and download_data.get("success"):
-                        public_image_url = f"{BASE_URL.rstrip('/')}{STATIC_ROUTE}/{image_filename}"
+                        public_image_url = f"{base_url}{STATIC_ROUTE}/{image_filename}"
+                        
+                        if download_data.get("thumb_filename"):
+                            thumbnail_url = f"{base_url}{STATIC_ROUTE}/{download_data['thumb_filename']}"
+
                         print(f"[bold green]🟢 Image ready at: {public_image_url}[/bold green]")
+                        print(f"[bold green]🟢 Thumbnail ready at: {thumbnail_url}[/bold green]")
                     else:
                         error_detail = download_data.get("error", "Unknown error") if download_data else "No response from downloader"
                         print(f"[bold red]🔴 Image download FAILED — product will have no image.[/bold red]")
                         print(f"[red]   Reason: {error_detail}[/red]")
                 else:
                     print(f"[yellow]⚠  No primary image URL found for product {product_id} — skipping download.[/yellow]")
-                # ─────────────────────────────────────────────────────────
 
                 data = {
+                    "id": product_id,
+                    "content_type": "product",
+                    "source": "ASOS",
                     "title": raw_data.get("name"),
                     "price": get_asos_price(product_id),
                     "brand": raw_data.get("brandName"),
                     "image_url": public_image_url,
+                    "thumbnail_url": thumbnail_url,
                     "url": raw_data.get("pdpUrl")
                 }
 
                 print(f"\n[bold green]✅ EXTRACTION COMPLETE — Attempt {attempt}[/bold green]")
-                print(f"[green]   Title : {data['title']}[/green]")
-                print(f"[green]   Brand : {data['brand']}[/green]")
-                print(f"[green]   Price : {data['price']}[/green]")
-                print(f"[green]   Image : {data['image_url'] or 'N/A'}[/green]\n")
+                print(f"[green]   Title     : {data['title']}[/green]")
+                print(f"[green]   Brand     : {data['brand']}[/green]")
+                print(f"[green]   Price     : {data['price']}[/green]")
+                print(f"[green]   Image     : {data['image_url'] or 'N/A'}[/green]")
+                print(f"[green]   Thumbnail : {data['thumbnail_url'] or 'N/A'}[/green]\n")
                 return data
 
             elif response.status_code >= 500:
@@ -181,18 +174,13 @@ def extract_asos(product_url: str):
     )
 
 
-# --- Zara Product Extraction Endpoint ---
-def get_zara_product_id(url: str) -> str:
-    import re
-    match = re.search(r'/p/(\d+)', url)
-    if match:
-        return match.group(1)
-    segment = url.rstrip("/").split("/")[-1].split(".")[0]
-    return segment if segment else str(abs(hash(url)))[:10]
-
-
 @app.get("/extract-zara", tags=["Product Extraction"])
-def extract_zara(product_url: str) -> dict:
+def extract_zara(product_url: str, request: Request) -> dict:
+    
+    product_id = extract_product_id(product_url)
+    if not product_id:
+        raise HTTPException(status_code=400, detail="Could not extract product ID from Zara URL")
+    
     url = f"{product_url}?ajax=true"
 
     print(f"\n[bold magenta]══════════════════════════════════════[/bold magenta]")
@@ -224,56 +212,49 @@ def extract_zara(product_url: str) -> dict:
     image_source_url = raw_data.get("product", {}).get("detail", {}).get("colors", [])[0].get("mainImgs", [])[0].get("extraInfo", {}).get("deliveryUrl", "")
     pdp_url = raw_data.get("productMetaData", [])[0].get("url")
 
-    print(f"[cyan]   Title  : {title}[/cyan]")
-    print(f"[cyan]   Brand  : {brand}[/cyan]")
-    print(f"[cyan]   Price  : £{price}[/cyan]")
-
-    # ── Image Download Block ──────────────────────────────────
+    base_url = str(request.base_url).rstrip("/")
     public_image_url = ""
+    thumbnail_url = ""
+
     if image_source_url:
-        product_id = get_zara_product_id(product_url)
+        print(f"Zara product ID: {product_id}")
         image_filename = f"zara_product_{product_id}.jpg"
 
         print(f"[bold cyan]\n🖼  Attempting image download for Zara product {product_id}...[/bold cyan]")
         download_data = download_image_advanced(image_source_url, DOWNLOAD_DIR, image_filename, proxy=PROXY)
 
         if download_data and download_data.get("success"):
-            public_image_url = f"{BASE_URL.rstrip('/')}{STATIC_ROUTE}/{image_filename}"
+            public_image_url = f"{base_url}{STATIC_ROUTE}/{image_filename}"
+            if download_data.get("thumb_filename"):
+                thumbnail_url = f"{base_url}{STATIC_ROUTE}/{download_data['thumb_filename']}"
             print(f"[bold green]🟢 Image ready at: {public_image_url}[/bold green]")
+            print(f"[bold green]🟢 Thumbnail ready at: {thumbnail_url}[/bold green]")
         else:
             error_detail = download_data.get("error", "Unknown error") if download_data else "No response from downloader"
             print(f"[bold red]🔴 Image download FAILED — product will have no image.[/bold red]")
             print(f"[red]   Reason: {error_detail}[/red]")
-    else:
-        print(f"[yellow]⚠  No image URL found in Zara response — skipping download.[/yellow]")
-    # ─────────────────────────────────────────────────────────
 
     product = {
+        "id": product_id,
+        "content_type": "product",
+        "source": "Zara",
         "title": title,
         "price": f"£{price}",
         "brand": brand,
         "image_url": public_image_url,
+        "thumbnail_url": thumbnail_url,
         "url": pdp_url
     }
 
-    print(f"\n[bold green]✅ ZARA EXTRACTION COMPLETE[/bold green]")
-    print(f"[green]   Title : {product['title']}[/green]")
-    print(f"[green]   Brand : {product['brand']}[/green]")
-    print(f"[green]   Price : {product['price']}[/green]")
-    print(f"[green]   Image : {product['image_url'] or 'N/A'}[/green]\n")
-
     return product
 
-# Extract COS product details
+
 @app.get("/extract-cos", tags=["Product Extraction"])
 def extract_cos(product_url: str) -> dict:
-    """
-    Extracts product title, price, brand, and image URL from a valid COS product link.
-    """
     product = get_cos(product_url)
     return product
 
-# --- CSV File Management Endpoints ---
+
 @app.post("/upload-csv", tags=["CSV Management"])
 async def upload_csv(file: UploadFile = File(...)):
     try:
@@ -296,7 +277,6 @@ async def upload_csv(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# --- File Download Endpoint ---
 @app.get("/download/{filename}", tags=["CSV Management"])
 async def download_file(filename: str):
     file_path = os.path.join(UPLOAD_DIR, filename)
@@ -311,7 +291,6 @@ async def download_file(filename: str):
     )
 
 
-# --- List Uploaded Files Endpoint ---
 @app.get("/list-files", tags=["CSV Management"])
 async def list_files():
     files = os.listdir(UPLOAD_DIR)
