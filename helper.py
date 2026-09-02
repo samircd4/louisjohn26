@@ -196,18 +196,21 @@ def download_image_advanced(url: str, folder_name: str, filename: str, proxy: st
     return result
 
 
-def get_bm_s_cookie(url):
+def get_bm_s_cookie(url: str) -> str | None:
+    """Fetches a fresh Akamai bm_s cookie using Playwright and returns it."""
+    print("\n[cyan]Generating new bm_s cookie...[/cyan]")
     with sync_playwright() as p:
         context = p.firefox.launch_persistent_context(
             user_data_dir=user_data_dir,
-            headless=True
+            headless=False
         )
         
         # launch_persistent_context opens a page automatically
         page = context.pages[0] if context.pages else context.new_page()
         page.goto(url)
-        # page.wait_for_load_state('documentloaded')  # Wait for the page to load completely
+        page.wait_for_load_state('load')  # Wait for the page to load completely
         print(page.title())
+        
         cookies = page.context.cookies()
         for cookie in cookies:
             if cookie['name'] == 'bm_s':
