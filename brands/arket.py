@@ -96,7 +96,7 @@ def get_arket_product(url: str) -> dict:
                 html = HTMLParser(response.text)
                 scripts = html.css('script[type="application/ld+json"]')
                 if not scripts:
-                    print(response.text)
+                    get_bm_s_cookie(url)
                     raise ValueError("No JSON-LD product data found on the page.")
 
                 payload = json.loads(scripts[0].text())
