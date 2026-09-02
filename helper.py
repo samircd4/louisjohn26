@@ -209,6 +209,7 @@ def get_bm_s_cookie(url: str) -> str | None:
         page = context.pages[0] if context.pages else context.new_page()
         page.goto(url)
         page.wait_for_load_state('load')  # Wait for the page to load completely
+        page.wait_for_timeout(5000)
         print(page.title())
         
         cookies = page.context.cookies()
