@@ -4,14 +4,17 @@ from PIL import Image
 from rich import print
 import re
 from urllib.parse import urlparse, parse_qs
+from playwright.sync_api import sync_playwright
 
 # Check environment, default to localhost for testing
 IS_PRODUCTION = os.getenv("PRODUCTION", "false").lower() == "true"
 
 if IS_PRODUCTION:
     BASE_URL = os.getenv("BASE_URL")
+    user_data_dir = os.path.abspath("firefox_profile")
 else:
     BASE_URL = "http://localhost:8080"
+    user_data_dir = r"C:\Users\samir\AppData\Roaming\Mozilla\Firefox\Profiles\xyz123.default-release"
 
 STATIC_ROUTE = "/images"
 
@@ -191,3 +194,28 @@ def download_image_advanced(url: str, folder_name: str, filename: str, proxy: st
     print(f"[bold red]❌ IMAGE DOWNLOAD FAILED — all {len(strategies)} strategies exhausted.[/bold red]")
     print(f"[red]   Last error: {last_error}[/red]")
     return result
+
+
+def get_bm_s_cookie(url):
+    with sync_playwright() as p:
+        context = p.firefox.launch_persistent_context(
+            user_data_dir=user_data_dir,
+            headless=True
+        )
+        
+        # launch_persistent_context opens a page automatically
+        page = context.pages[0] if context.pages else context.new_page()
+        page.goto(url)
+        # page.wait_for_load_state('documentloaded')  # Wait for the page to load completely
+        print(page.title())
+        cookies = page.context.cookies()
+        for cookie in cookies:
+            if cookie['name'] == 'bm_s':
+                print(f"Found bm_s cookie: {cookie['value']}")
+                with open("bm_s_cookie.txt", "w") as f:
+                    f.write(cookie['value'])
+        context.close()
+
+
+if __name__ == "__main__":
+    get_bm_s_cookie("https://www.cos.com/en-gb/men/menswear/coatsjackets/denim/product/denim-shirt-jacket-blue-1340981001")

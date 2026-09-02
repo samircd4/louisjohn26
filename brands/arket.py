@@ -13,14 +13,13 @@ from curl_cffi import requests, CurlError
 from dotenv import load_dotenv
 
 # Custom modules
-from helper import BASE_URL, STATIC_ROUTE, create_thumbnail, _attempt_download
+from helper import BASE_URL, STATIC_ROUTE, create_thumbnail, _attempt_download, get_bm_s_cookie
 
 
 load_dotenv()
 PROXY = None # os.getenv('PROXY')
 MAX_RETRIES = 5
 PROXY_SPIN_TIMEOUT = 5  # seconds
-ARKET_BM_S = os.getenv('ARKET_BM_S')
 
 
 def get_arket_product(url: str) -> dict:
@@ -48,6 +47,9 @@ def get_arket_product(url: str) -> dict:
 
     try:
         time.sleep(1)  # Sleep for 1 second to avoid overwhelming the server
+        with open("bm_s_cookie.txt", "r") as f:
+            ARKET_BM_S = f.read().strip()
+        
         cookies = {
             "bm_s": ARKET_BM_S,
         }
@@ -81,8 +83,13 @@ def get_arket_product(url: str) -> dict:
                     timeout=20,
                     impersonate="chrome124",
                 )
+                if response.status_code == 403:
+                    get_bm_s_cookie(url)
+                    with open("bm_s_cookie.txt", "r") as f:
+                        cookies["bm_s"] = f.read().strip()
+
                 if response.status_code != 200:
-                    raise requests.HTTPError(
+                    raise ValueError(
                         f"Failed to fetch the product page. Status code: {response.status_code}"
                     )
 
