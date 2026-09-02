@@ -2,6 +2,7 @@
 from selectolax.parser import HTMLParser
 from rich import print
 import requests
+from dotenv import load_dotenv
 
 # Custom modules
 from helper import BASE_URL, STATIC_ROUTE, create_thumbnail, _attempt_download
@@ -10,6 +11,9 @@ from helper import BASE_URL, STATIC_ROUTE, create_thumbnail, _attempt_download
 import os
 import json
 import time
+
+load_dotenv()
+PROXY = os.getenv('PROXY')
 
 
 def get_arket_product(url: str) -> dict:
@@ -63,6 +67,7 @@ def get_arket_product(url: str) -> dict:
             url,
             cookies=cookies,
             headers=headers,
+            proxies={'http': PROXY, 'https': PROXY},
             timeout=20,
             )
         if response.status_code != 200:
@@ -89,7 +94,7 @@ def get_arket_product(url: str) -> dict:
             raise ValueError('No image URLs found for the product.')
 
         image_url = str(images[0]).split('?')[0]
-        image = _attempt_download(image_url, use_http2=True, proxy=False)
+        image = _attempt_download(image_url, use_http2=True, proxy=PROXY)
         if not isinstance(image, (bytes, bytearray)):
             raise TypeError('Downloaded image payload is invalid.')
 
