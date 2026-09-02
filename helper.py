@@ -9,9 +9,9 @@ from urllib.parse import urlparse, parse_qs
 IS_PRODUCTION = os.getenv("PRODUCTION", "false").lower() == "true"
 
 if IS_PRODUCTION:
-    BASE_URL = os.getenv("BASE_URL", "http://76.13.243.197:8080/")
+    BASE_URL = os.getenv("BASE_URL")
 else:
-    BASE_URL = "http://127.0.0.1:8000"
+    BASE_URL = "http://localhost:8080"
 
 STATIC_ROUTE = "/images"
 
@@ -78,7 +78,7 @@ def create_thumbnail(image_path: str, size: tuple = (200, 200)) -> str | None:
         thumb_filename = f"{filename}_thumb{ext}"
 
         with Image.open(image_path) as img:
-            img.convert("RGB")
+            img = img.convert("RGB")
             img.thumbnail(size)
             img.save(thumb_filename)
 

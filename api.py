@@ -10,7 +10,7 @@ import shutil
 from rich import print
 from dotenv import load_dotenv
 
-from brands.cos import get_cos_product
+# from brands.cos import get_cos_product
 from brands.asos import get_asos_product
 from brands.arket import get_arket_product
 from brands.zara import get_zara_product
@@ -56,7 +56,7 @@ MAX_RETRIES = 3
 @app.get("/extract-asos", tags=["Product Extraction"])
 def extract_asos(product_url: str, request: Request):
     try:
-        return get_asos_product(product_url, request=request)
+        return get_asos_product(product_url)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except RuntimeError as exc:
@@ -73,14 +73,14 @@ def extract_zara(product_url: str, request: Request) -> dict:
         raise HTTPException(status_code=500, detail=str(exc))
 
 
-@app.get("/extract-cos", tags=["Product Extraction"])
-def extract_cos(product_url: str) -> dict:
-    try:
-        return get_cos_product(product_url)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    except RuntimeError as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+# @app.get("/extract-cos", tags=["Product Extraction"])
+# def extract_cos(product_url: str) -> dict:
+#     try:
+#         return get_cos_product(product_url)
+#     except ValueError as exc:
+#         raise HTTPException(status_code=400, detail=str(exc))
+#     except RuntimeError as exc:
+#         raise HTTPException(status_code=500, detail=str(exc))
 
 
 @app.get("/extract-arket", tags=["Product Extraction"])

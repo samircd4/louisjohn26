@@ -1,13 +1,20 @@
+# Built in modules
+import sys
 import os
 import time
-import requests
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Installed modules
 from rich import print
+from dotenv import load_dotenv
+import requests
 
-from helper import download_image_advanced, extract_product_id
+# Custom modules
+from helper import BASE_URL, STATIC_ROUTE, download_image_advanced, extract_product_id
 
+load_dotenv()
 PROXY = os.getenv("PROXY")
 MAX_RETRIES = 3
-STATIC_ROUTE = "/images"
 DOWNLOAD_DIR = "images"
 
 
@@ -32,7 +39,7 @@ def get_asos_price(product_id: str):
         return ""
 
 
-def get_asos_product(product_url: str, request=None) -> dict:
+def get_asos_product(product_url: str) -> dict:
     """Fetch and normalize an ASOS product record from its product URL."""
     product_id = extract_product_id(product_url)
     if not product_id:
@@ -46,7 +53,6 @@ def get_asos_product(product_url: str, request=None) -> dict:
 
     last_error = None
     proxies = {"http": PROXY, "https": PROXY}
-    base_url = str(request.base_url).rstrip("/") if request else "http://localhost"
 
     for attempt in range(1, MAX_RETRIES + 1):
         print(f"\n[bold white]── Attempt {attempt}/{MAX_RETRIES} ──[/bold white]")
@@ -71,10 +77,10 @@ def get_asos_product(product_url: str, request=None) -> dict:
                     download_data = download_image_advanced(image_url, DOWNLOAD_DIR, image_filename, proxy=PROXY)
 
                     if download_data and download_data.get("success"):
-                        public_image_url = f"{base_url}{STATIC_ROUTE}/{image_filename}"
+                        public_image_url = f"{BASE_URL.rstrip('/')}{STATIC_ROUTE}/{image_filename}"
 
                         if download_data.get("thumb_filename"):
-                            thumbnail_url = f"{base_url}{STATIC_ROUTE}/{download_data['thumb_filename']}"
+                            thumbnail_url = f"{BASE_URL.rstrip('/')}{STATIC_ROUTE}/{download_data['thumb_filename']}"
 
                         print(f"[bold green]🟢 Image ready at: {public_image_url}[/bold green]")
                         print(f"[bold green]🟢 Thumbnail ready at: {thumbnail_url}[/bold green]")

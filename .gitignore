@@ -14,3 +14,5 @@ venv/
 images/
 vps_guide.md
 test.py
+domain_test.py
+test_arket_browser.py
