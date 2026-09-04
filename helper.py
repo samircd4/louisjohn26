@@ -196,9 +196,9 @@ def download_image_advanced(url: str, folder_name: str, filename: str, proxy: st
     return result
 
 
-def get_bm_s_cookie(url: str) -> str | None:
+def get_html_content(url: str) -> str | None:
     """Fetches a fresh Akamai bm_s cookie using Playwright and returns it."""
-    print("\n[cyan]Generating new bm_s cookie...[/cyan]")
+    print(f"\n[cyan]Fetching {url}...[/cyan]")
     with sync_playwright() as p:
         context = p.firefox.launch_persistent_context(
             user_data_dir=user_data_dir,
@@ -208,18 +208,11 @@ def get_bm_s_cookie(url: str) -> str | None:
         # launch_persistent_context opens a page automatically
         page = context.pages[0] if context.pages else context.new_page()
         page.goto(url)
-        page.wait_for_load_state('load')  # Wait for the page to load completely
-        page.wait_for_timeout(5000)
-        print(page.title())
-        
-        cookies = page.context.cookies()
-        for cookie in cookies:
-            if cookie['name'] == 'bm_s':
-                print(f"Found bm_s cookie: {cookie['value']}")
-                with open("bm_s_cookie.txt", "w") as f:
-                    f.write(cookie['value'])
+        page.wait_for_load_state('domcontentloaded')  # Wait for the page to load completely
+        page.wait_for_timeout(2000)
+        html_content = page.content()
         context.close()
-
+        return html_content
 
 if __name__ == "__main__":
-    get_bm_s_cookie("https://www.cos.com/en-gb/men/menswear/coatsjackets/denim/product/denim-shirt-jacket-blue-1340981001")
+    print(get_html_content("https://www.arket.com/en-gb/product/desert-kick-flare-jeans-white-1360778002/"))
