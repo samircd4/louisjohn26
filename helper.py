@@ -202,15 +202,18 @@ def get_html_content(url: str) -> str | None:
     with sync_playwright() as p:
         context = p.firefox.launch_persistent_context(
             user_data_dir=user_data_dir,
-            headless=True
+            headless=True,
+            ignore_https_errors=True,
         )
         
         # launch_persistent_context opens a page automatically
         page = context.pages[0] if context.pages else context.new_page()
         page.goto(url)
         page.wait_for_load_state('domcontentloaded')  # Wait for the page to load completely
-        page.wait_for_timeout(2000)
+        page.wait_for_timeout(5000)
         html_content = page.content()
+        with open("debug_page.html", "w", encoding="utf-8") as f:
+            f.write(html_content)
         context.close()
         return html_content
 
